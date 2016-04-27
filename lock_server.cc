@@ -9,6 +9,14 @@
 lock_server::lock_server():
   nacquire (0)
 {
+    VERIFY(pthread_mutex_init(&_ol, 0) == 0);
+    VERIFY(pthread_cond_init(&_wc, 0) == 0);
+}
+
+lock_server::~lock_server()
+{
+    VERIFY(pthread_mutex_destroy(&_ol) == 0);
+    VERIFY(pthread_cond_destroy(&_wc) == 0);
 }
 
 lock_protocol::status
@@ -20,4 +28,57 @@ lock_server::stat(int clt, lock_protocol::lockid_t lid, int &r)
   return ret;
 }
 
+lock_protocol::status
+lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
+{
+    pthread_mutex_lock(&_ol);
+    unordered_map<lock_protocol::lockid_t, l_status>::iterator index = l_t.find(lid);
+    if(index == l_t.end()){
+        l_t[lid] = LOCKED;
+        r = ++nacquire;
+        pthread_mutex_unlock(&_ol);
+        lock_protocol::status ret = lock_protocol::OK;
+        printf("ACQUIRE DONE: successfully acquiring the lock (lock_id:%016llx)!\n", lid);
+        return ret;
+    }
+    else{
+        while(index->second == LOCKED){
+            pthread_cond_wait(&_wc, &_ol);
+        }
+        index->second = LOCKED;
+        r = ++nacquire;
+        pthread_mutex_unlock(&_ol);
+        lock_protocol::status ret = lock_protocol::OK;
+        printf("ACQUIRE DONE: successfully acquiring the lock (lock_id: %016llx)!\n", lid);
+        return ret;
+    }
+}
 
+lock_protocol::status
+lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
+{
+    pthread_mutex_lock(&_ol);
+    unordered_map<lock_protocol::lockid_t, l_status>::iterator index = l_t.find(lid);
+    if(index == l_t.end()){
+        r = nacquire;
+        pthread_mutex_unlock(&_ol);
+        lock_protocol::status ret = lock_protocol::NOLOCK;
+        printf("ERROR: No such lock (lock_id:%016llx) exists in the serve!\n", lid);
+        return ret;
+    }
+    
+    if(index->second == LOCKED){
+        index->second = FREE;
+        pthread_cond_broadcast(&_wc);
+        r = --nacquire;
+        printf("RELEASE DONE: successfully releasing lock(lock_id:%016llx)!\n", lid);
+    }
+    else{
+        r = nacquire;
+        printf("WARNING: RE-releasing problem for the lock (lock_id: %016llx)!\n", lid);
+    }
+    pthread_mutex_unlock(&_ol);
+    lock_protocol::status ret = lock_protocol::OK;
+
+    return ret;
+}

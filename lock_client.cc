@@ -2,6 +2,7 @@
 
 #include "lock_client.h"
 #include "rpc.h"
+#include "lang/verify.h"
 #include <arpa/inet.h>
 
 #include <sstream>
@@ -18,6 +19,11 @@ lock_client::lock_client(std::string dst)
   }
 }
 
+lock_client::~lock_client()
+{
+    delete cl;
+}
+
 int
 lock_client::stat(lock_protocol::lockid_t lid)
 {
@@ -30,10 +36,18 @@ lock_client::stat(lock_protocol::lockid_t lid)
 lock_protocol::status
 lock_client::acquire(lock_protocol::lockid_t lid)
 {
+    int r;
+    lock_protocol::status ret = cl->call(lock_protocol::acquire, cl->id(), lid, r);
+    VERIFY(ret == lock_protocol::OK);
+    return ret;
 }
 
 lock_protocol::status
 lock_client::release(lock_protocol::lockid_t lid)
 {
+    int r;
+    lock_protocol::status ret = cl->call(lock_protocol::release, cl->id(), lid, r);
+    VERIFY(ret == lock_protocol::OK);
+    return ret;
 }
 

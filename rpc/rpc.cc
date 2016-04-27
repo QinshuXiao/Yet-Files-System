@@ -415,6 +415,7 @@ rpcs::rpcs(unsigned int p1, int count)
 	VERIFY(pthread_mutex_init(&count_m_, 0) == 0);
 	VERIFY(pthread_mutex_init(&reply_window_m_, 0) == 0);
 	VERIFY(pthread_mutex_init(&conss_m_, 0) == 0);
+    VERIFY(pthread_mutex_init(&last_reply_xid_m_, 0) == 0);
 
 	set_rand_seed();
 	nonce_ = random();
@@ -559,7 +560,12 @@ rpcs::dispatch(djob_t *j)
 				jsl_log(JSL_DBG_2,
 						"rpcs::dispatch: new client %u xid %d chan %d, total clients %d\n", 
 						h.clt_nonce, h.xid, c->channo(), (int)reply_window_.size());
-			}
+                {
+                    ScopedLock rxl(&last_reply_xid_m_);
+                    last_reply_xid_[h.clt_nonce];
+                }
+            }
+
 		}
 
 		// save the latest good connection to the client
@@ -629,7 +635,7 @@ rpcs::dispatch(djob_t *j)
 		case INPROGRESS: // server is working on this request
 			break;
 		case DONE: // duplicate and we still have the response
-			c->send(b1, sz1);
+            c->send(b1, sz1);
 			break;
 		case FORGOTTEN: // very old request and we don't have the response anymore
 			jsl_log(JSL_DBG_2, "rpcs::dispatch: very old request %u from %u\n", 
@@ -661,9 +667,51 @@ rpcs::checkduplicate_and_update(unsigned int clt_nonce, unsigned int xid,
 		unsigned int xid_rep, char **b, int *sz)
 {
 	ScopedLock rwl(&reply_window_m_);
-
+   
         // You fill this in for Lab 1.
-	return NEW;
+    rpcstate_t res;
+    if(xid <= last_reply_xid_[clt_nonce]){
+        res = FORGOTTEN;
+    }
+    else{
+        std::list<reply_t>::iterator it = reply_window_[clt_nonce].begin();
+        for(; it != reply_window_[clt_nonce].end(); ++it){
+            if(xid < it->xid){
+                res = NEW;
+                reply_window_[clt_nonce].insert(it, reply_t(xid));
+                break;
+            }
+            else if(xid == it->xid){
+                if(it->cb_present){
+                    res = DONE;
+                    *sz = it->sz;
+                    *b = it->buf;
+                }
+                else{
+                    res = INPROGRESS;
+                }
+                break;
+            }
+        }
+
+        if(it == reply_window_[clt_nonce].end()){
+            res = NEW;
+            reply_window_[clt_nonce].push_back(reply_t(xid));
+        }
+    }
+
+    if(last_reply_xid_[clt_nonce] < xid_rep){
+        {
+            ScopedLock rxl(&last_reply_xid_m_);
+            last_reply_xid_[clt_nonce] = xid_rep;
+        }
+
+        while(!reply_window_[clt_nonce].empty() && reply_window_[clt_nonce].front().xid <= xid_rep){
+            free(reply_window_[clt_nonce].front().buf);
+            reply_window_[clt_nonce].pop_front();
+        }
+    }
+	return res;
 }
 
 // rpcs::dispatch calls add_reply when it is sending a reply to an RPC,
@@ -677,6 +725,19 @@ rpcs::add_reply(unsigned int clt_nonce, unsigned int xid,
 {
 	ScopedLock rwl(&reply_window_m_);
         // You fill this in for Lab 1.
+    VERIFY(reply_window_.find(clt_nonce) != reply_window_.end());
+    
+    std::list<reply_t>::iterator it = reply_window_[clt_nonce].begin();
+    for(;it != reply_window_[clt_nonce].end();++it){
+        if(xid == it->xid){
+            it->sz = sz;
+            it->buf = b;
+            it->cb_present = true;
+            break;
+        }
+    }
+
+    VERIFY(it != reply_window_[clt_nonce].end());
 }
 
 void
@@ -693,6 +754,11 @@ rpcs::free_reply_window(void)
 		clt->second.clear();
 	}
 	reply_window_.clear();
+    
+    {
+        ScopedLock rxl(&last_reply_xid_m_);
+        last_reply_xid_.clear();
+    }
 }
 
 // rpc handler

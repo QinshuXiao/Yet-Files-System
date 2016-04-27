@@ -6,6 +6,7 @@
 #include <list>
 #include <map>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "thr_pool.h"
 #include "marshall.h"
@@ -298,6 +299,7 @@ class rpcs : public chanmgr {
 	// per client that that client hasn't acknowledged receiving yet.
         // indexed by client nonce.
 	std::map<unsigned int, std::list<reply_t> > reply_window_;
+    std::map<unsigned int, unsigned int> last_reply_xid_;
 
 	void free_reply_window(void);
 	void add_reply(unsigned int clt_nonce, unsigned int xid, char *b, int sz);
@@ -326,7 +328,7 @@ class rpcs : public chanmgr {
 	pthread_mutex_t count_m_;  //protect modification of counts
 	pthread_mutex_t reply_window_m_; // protect reply window et al
 	pthread_mutex_t conss_m_; // protect conns_
-
+    pthread_mutex_t last_reply_xid_m_; // protect last_reply_xid et al
 
 	protected:
 

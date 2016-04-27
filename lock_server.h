@@ -5,21 +5,30 @@
 #define lock_server_h
 
 #include <string>
+#include <unordered_map>
 #include "lock_protocol.h"
 #include "lock_client.h"
 #include "rpc.h"
+#include <pthread.h>
+using namespace std;
 
 class lock_server {
 
  protected:
   int nacquire;
+  
+  enum l_status {FREE, LOCKED};
+  unordered_map<lock_protocol::lockid_t, l_status> l_t;
+  pthread_mutex_t _ol;
+  pthread_cond_t _wc;
 
  public:
   lock_server();
-  ~lock_server() {};
+  ~lock_server();
   lock_protocol::status stat(int clt, lock_protocol::lockid_t lid, int &);
+  lock_protocol::status acquire(int clt, lock_protocol::lockid_t lid, int &);
+  lock_protocol::status release(int clt, lock_protocol::lockid_t lid, int &);
 };
-
 #endif 
 
 

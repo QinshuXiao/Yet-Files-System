@@ -121,7 +121,7 @@ client1(void *xx)
 		int arg = (random() % 2000);
 		std::string rep;
 		int ret = clients[which_cl]->call(25, arg, rep);
-		VERIFY(ret == 0);
+        VERIFY(ret == 0);
 		if ((int)rep.size()!=arg) {
 			printf("repsize wrong %d!=%d\n", (int)rep.size(), arg);
 		}
@@ -162,7 +162,7 @@ client2(void *xx)
 		int arg = (random() % 2000);
 		std::string rep;
 		int ret = clients[which_cl]->call(25, arg, rep);
-		if ((int)rep.size()!=arg) {
+        if ((int)rep.size()!=arg) {
 			printf("ask for %d reply got %d ret %d\n",
                                arg, (int)rep.size(), ret);
 		}
