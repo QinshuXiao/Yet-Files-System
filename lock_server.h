@@ -12,15 +12,28 @@
 #include <pthread.h>
 using namespace std;
 
+class lock{
+    public:
+        enum lock_status {FREE, LOCKED};
+        int l_status;
+        pthread_cond_t _wc;
+        lock_protocol::lockid_t lid;
+        lock(lock_protocol::lockid_t _lid) : lid(_lid){
+            VERIFY(pthread_cond_init(&_wc, 0) == 0);
+        }
+        ~lock(){
+            VERIFY(pthread_cond_destroy(&_wc) == 0);
+        }
+};
+
 class lock_server {
 
  protected:
   int nacquire;
   
-  enum l_status {FREE, LOCKED};
-  unordered_map<lock_protocol::lockid_t, l_status> l_t;
+  unordered_map<lock_protocol::lockid_t, lock*> l_t;
   pthread_mutex_t _ol;
-  pthread_cond_t _wc;
+  //pthread_cond_t _wc;
 
  public:
   lock_server();
@@ -29,6 +42,7 @@ class lock_server {
   lock_protocol::status acquire(int clt, lock_protocol::lockid_t lid, int &);
   lock_protocol::status release(int clt, lock_protocol::lockid_t lid, int &);
 };
+
 #endif 
 
 
