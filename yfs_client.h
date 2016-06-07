@@ -54,6 +54,7 @@ class yfs_client {
   int create(inum, std::string, extent_protocol::extentid_t &);
   int lookup(inum, std::string, extent_protocol::extentid_t &);
   int readdir(inum, std::map<std::string, extent_protocol::extentid_t> &);
+  int unlink(inum, const char*);
 };
 
 #endif 

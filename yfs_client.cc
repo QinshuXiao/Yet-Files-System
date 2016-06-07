@@ -269,3 +269,30 @@ int yfs_client::readdir(inum dir_id, std::map<std::string, extent_protocol::exte
 
     return r;
 }
+
+int yfs_client::unlink(inum pid, const char *name)
+{
+    int r = OK;
+    printf("Unlink between dir:%lld and file:%s!\n ", pid, name);
+
+    if(isfile(pid)){
+        r = IOERR;
+        printf("The inum of dir (id:%lld) is unvalid, because it's a inum id for file!\n", pid);
+        return r;
+    }
+    
+    extent_protocol::extentid_t eid;
+    extent_protocol::status ret;
+    ret = ec->lookup(pid, name, eid);
+    if(ret != extent_protocol::OK){
+        r = NOENT;
+        return r;
+    }
+
+    ret = ec->remove(eid);
+    if(ret == extent_protocol::NOENT){
+        r = NOENT;
+    }
+
+    return r;
+}

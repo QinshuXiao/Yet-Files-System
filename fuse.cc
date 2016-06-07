@@ -473,6 +473,11 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
   // You fill this in for Lab 3
   // Success:	fuse_reply_err(req, 0);
   // Not found:	fuse_reply_err(req, ENOENT);
+  yfs_client::inum pid = parent;
+  yfs_client::status ret = yfs->unlink(pid, name);
+  
+  if(ret == yfs_client::OK) fuse_reply_err(req, 0);
+
   fuse_reply_err(req, ENOSYS);
 }
 
