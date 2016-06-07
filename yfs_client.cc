@@ -1,6 +1,7 @@
 // yfs client.  implements FS operations using extent and lock server
 #include "yfs_client.h"
 #include "extent_client.h"
+#include "lock_client.h"
 #include <sstream>
 #include <iostream>
 #include <stdio.h>
@@ -47,7 +48,9 @@ bool yfs_client::isdir(inum inum)
 int yfs_client::getfile(inum inum, fileinfo &fin)
 {
   int r = OK;
-
+  
+  // You modify this function for Lab3
+  // - hold and release the file lock
   printf("get file attr %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {
@@ -103,7 +106,9 @@ int yfs_client::setfile(inum inum, struct stat *attr)
 int yfs_client::getdir(inum inum, dirinfo &din)
 {
   int r = OK;
-
+  
+  // You modify this function for Lab3
+  // - hold and release the directory lock
   printf("getdir %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {

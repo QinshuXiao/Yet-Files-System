@@ -8,6 +8,9 @@
 #include <map>
 #include <utility>
 
+#include "lock_protocol"
+#include "lock_client.h"
+
 class yfs_client {
   extent_client *ec;
  public:
