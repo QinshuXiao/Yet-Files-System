@@ -7,7 +7,6 @@
 #include <map>
 #include <unordered_map>
 #include <utility>
-#include <random>
 #include <ctime>
 #include <memory>
 #include <unistd.h>
@@ -26,16 +25,12 @@ struct extent_t{
 
     std::string buf;
     extent_protocol::attr attr;
-    //pthread_mutex_t eo;
-    //pthread_cond_t ec;
     
     extent_t() = default;
 
     extent_t(extent_protocol::extentid_t _eid, extent_protocol::extentid_t _peid, std::string _name, int sz = 0):eid(_eid), parent_eid(_peid), name(_name){
         attr.atime = attr.ctime = attr.mtime = std::time(nullptr);
         attr.size = sz;
-        //VERIFY(pthread_mutex_init(&eo, 0) == 0);
-        //VERIFY(pthread_cond_init(&ec, 0) == 0);
     }
 
     extent_t(const extent_t &_extent):eid(_extent.eid), parent_eid(_extent.parent_eid), name(_extent.name), buf(_extent.buf) {}
@@ -64,7 +59,7 @@ class extent_server {
     int getattr(extent_protocol::extentid_t id, extent_protocol::attr &);
     int remove(extent_protocol::extentid_t id, int &);
     int lookup(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t &ret);
-    int create(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t &ret);
+    int create(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t eid, int &);
     int readdir(extent_protocol::extentid_t id, std::map<std::string, extent_protocol::extentid_t> &ret);
 
   private:
@@ -74,7 +69,6 @@ class extent_server {
         return (id & 0x80000000) != 0; 
     }
 
-    std::default_random_engine rd_gen;
 };
 
 #endif 

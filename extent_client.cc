@@ -55,10 +55,11 @@ extent_client::remove(extent_protocol::extentid_t eid)
 }
 
 extent_protocol::status
-extent_client::create(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t &eid)
+extent_client::create(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t eid)
 {
     extent_protocol::status ret = extent_protocol::OK;
-    ret = cl->call(extent_protocol::create, parent_eid, name, eid);
+    int r;
+    ret = cl->call(extent_protocol::create, parent_eid, name, eid, r);
     return ret;
 }
 

@@ -7,8 +7,9 @@
 #include <vector>
 #include <map>
 #include <utility>
+#include <random>
 
-#include "lock_protocol"
+#include "lock_protocol.h"
 #include "lock_client.h"
 
 class yfs_client {
@@ -38,6 +39,7 @@ class yfs_client {
  private:
   static std::string filename(inum);
   static inum n2i(std::string);
+  std::default_random_engine rd_gen;
  public:
 
   yfs_client(std::string, std::string);
@@ -51,9 +53,9 @@ class yfs_client {
   int readfile(inum, std::size_t, std::size_t, std::string &);
   int writefile(inum, std::size_t, std::size_t, const char *);
 
-  int create(inum, std::string, extent_protocol::extentid_t &);
-  int lookup(inum, std::string, extent_protocol::extentid_t &);
-  int readdir(inum, std::map<std::string, extent_protocol::extentid_t> &);
+  int create(inum, std::string, inum &, bool);
+  int lookup(inum, std::string, inum &);
+  int readdir(inum, std::map<std::string, inum> &);
   int unlink(inum, const char*);
 };
 

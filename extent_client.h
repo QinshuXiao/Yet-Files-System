@@ -27,7 +27,7 @@ class extent_client {
   extent_protocol::status remove(extent_protocol::extentid_t eid);
 
   extent_protocol::status create(extent_protocol::extentid_t parent_eid, 
-                  std::string name, extent_protocol::extentid_t &eid);
+                  std::string name, extent_protocol::extentid_t eid);
   
   extent_protocol::status lookup(extent_protocol::extentid_t parent_eid, 
                   std::string name, extent_protocol::extentid_t &eid);

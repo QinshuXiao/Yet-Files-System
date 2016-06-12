@@ -12,7 +12,7 @@
 #include <ctime>
 
 
-yfs_client::yfs_client(std::string extent_dst, std::string lock_dst)
+yfs_client::yfs_client(std::string extent_dst, std::string lock_dst):rd_gen(std::time(0))
 {
   ec = new extent_client(extent_dst);
 
@@ -204,11 +204,12 @@ int yfs_client::writefile(inum inum, std::size_t off, std::size_t size, const ch
     return r;
 }
 
-int yfs_client::create(inum pid, std::string name, extent_protocol::extentid_t &eid)
+int yfs_client::create(inum pid, std::string name, inum &eid, bool is_dir=false)
 {
     int r = OK;
 
-    printf("Create a file named:%s under the dir with id:%lld!\n", name.c_str(), pid);
+    if(!is_dir) printf("Create a file named:%s under the dir with id:%lld!\n", name.c_str(), pid);
+    else printf("Create a dir named:%s under the dir with id:%lld!\n", name.c_str(), pid);
 
     if(isfile(pid)){
         r = IOERR;
@@ -216,26 +217,50 @@ int yfs_client::create(inum pid, std::string name, extent_protocol::extentid_t &
         return r;
     }
 
-    extent_protocol::status ret = ec->create(pid, name, eid);
-    if(ret != extent_protocol::OK){
-        if(ret == extent_protocol::EXIST){
-            printf("The file with name:%s is existed under the dir:%lld!\n", name.c_str(), pid);
-            r = EXIST;
-        }
-        else if(ret == extent_protocol::IOERR){
-            printf("IO ERROR happened when creating a new file(name:%s) under the dir:%lld!\n", name.c_str(), pid);
+    inum _id;
+    extent_protocol::status ret = ec->lookup(pid, name, _id);
+    if(ret == extent_protocol::OK){
+        // which means other extent with the same name has already existed
+        printf("The extent with name:%s has already existed under the dir:%lld!\n", name.c_str(), pid);
+        r = EXIST;
+        return r;
+    }
+    else if(ret == extent_protocol::IOERR){
+            printf("IO ERROR happened when creating a new extent(name:%s) under the dir:%lld!\n", name.c_str(), pid);
             r = IOERR;
+            return r;
+    }
+    
+    inum new_inum;
+    // pick a random number as new_inum for new extent
+    for(int i = 0; i < 20; ++i){
+        new_inum = rd_gen();
+        if(is_dir) new_inum &= 0x7FFFFFFF;
+        else new_inum |= 0x80000000;
+        
+        extent_protocol::attr attr;
+        if(extent_protocol::OK == ec->getattr(new_inum, attr)){
+            // which means that the new_inum is existed and occupied by other extent
+            continue;
         }
-        else if(ret == extent_protocol::NOENT){
-            printf("No dir with id:%lld exists in ext_server!\n", pid);
-            r = NOENT;
+        else{
+            ret = ec->create(pid, name, new_inum);
+            if(ret == extent_protocol::OK){
+                r = OK;
+                eid = new_inum;
+            }
+            else{
+                r = IOERR;
+            }
+
+            break;
         }
     }
 
     return r;
 }
 
-int yfs_client::lookup(inum pid, std::string name, extent_protocol::extentid_t &eid)
+int yfs_client::lookup(inum pid, std::string name, inum &eid)
 {
     int r = OK;
     printf("Looking for a file named:%s under the dir:%lld\n", name.c_str(), pid);
@@ -256,7 +281,7 @@ int yfs_client::lookup(inum pid, std::string name, extent_protocol::extentid_t &
     return r;
 }
 
-int yfs_client::readdir(inum dir_id, std::map<std::string, extent_protocol::extentid_t> &ext_map)
+int yfs_client::readdir(inum dir_id, std::map<std::string, inum> &ext_map)
 {
     int r = OK;
     printf("Reading dir info (dir id:%lld)!\n", dir_id);
@@ -281,11 +306,12 @@ int yfs_client::unlink(inum pid, const char *name)
         return r;
     }
     
-    extent_protocol::extentid_t eid;
+    inum eid;
     extent_protocol::status ret;
     ret = ec->lookup(pid, name, eid);
     if(ret != extent_protocol::OK){
         r = NOENT;
+        printf("No file named:%s exists under the dir:%lld\n", name, pid);
         return r;
     }
 
