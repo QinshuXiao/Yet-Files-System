@@ -11,9 +11,11 @@
 
 #include "lock_protocol.h"
 #include "lock_client.h"
+#include "remote_scoped_lock.h"
 
 class yfs_client {
   extent_client *ec;
+  lock_client *lc;
  public:
 
   typedef unsigned long long inum;
@@ -43,7 +45,7 @@ class yfs_client {
  public:
 
   yfs_client(std::string, std::string);
-
+  ~yfs_client();
   bool isfile(inum);
   bool isdir(inum);
 

@@ -10,16 +10,11 @@ lock_server::lock_server():
   nacquire (0)
 {
     VERIFY(pthread_mutex_init(&_ol, 0) == 0);
-    //VERIFY(pthread_cond_init(&_wc, 0) == 0);
 }
 
 lock_server::~lock_server()
 {
     VERIFY(pthread_mutex_destroy(&_ol) == 0);
-    //VERIFY(pthread_cond_destroy(&_wc) == 0);
-    for(auto it = l_t.begin(); it != l_t.end(); ++it){
-        delete it->second;
-    }
 }
 
 lock_protocol::status
@@ -35,45 +30,45 @@ lock_protocol::status
 lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
 {
     pthread_mutex_lock(&_ol);
-    unordered_map<lock_protocol::lockid_t, lock*>::iterator index = l_t.find(lid);
+    lock_protocol::status ret = lock_protocol::OK;
+    auto index = l_t.find(lid);
     if(index == l_t.end()){
-        lock* nl = new lock(lid);
-        nl->l_status = lock::LOCKED;
-        l_t[lid] = nl;
+        l_t[lid] = std::make_shared<lock>(lid); 
+        l_t[lid]->l_status = lock::LOCKED;
         r = ++nacquire;
         pthread_mutex_unlock(&_ol);
-        lock_protocol::status ret = lock_protocol::OK;
+        ret = lock_protocol::OK;
         printf("ACQUIRE DONE: successfully acquiring the lock (lock_id:%016llx)!\n", lid);
         return ret;
     }
-    else{
-        lock* lt = index->second;
-        while(lt->l_status == lock::LOCKED){
-            pthread_cond_wait(&lt->_wc, &_ol);
-        }
-        lt->l_status = lock::LOCKED;
-        r = ++nacquire;
-        pthread_mutex_unlock(&_ol);
-        lock_protocol::status ret = lock_protocol::OK;
-        printf("ACQUIRE DONE: successfully acquiring the lock (lock_id: %016llx)!\n", lid);
-        return ret;
+
+    auto lt = index->second;
+    while(lt->l_status == lock::LOCKED){
+        printf("I'm waiting for the lock: %llx\n",lid);
+        pthread_cond_wait(&lt->_wc, &_ol);
     }
+    lt->l_status = lock::LOCKED;
+    r = ++nacquire;
+    pthread_mutex_unlock(&_ol);
+    printf("ACQUIRE DONE: successfully acquiring the lock (lock_id: %016llx)!\n", lid);
+    return ret;
 }
 
 lock_protocol::status
 lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
 {
     pthread_mutex_lock(&_ol);
-    unordered_map<lock_protocol::lockid_t, lock*>::iterator index = l_t.find(lid);
+    lock_protocol::status ret = lock_protocol::OK;
+    auto index = l_t.find(lid);
     if(index == l_t.end()){
         r = nacquire;
         pthread_mutex_unlock(&_ol);
-        lock_protocol::status ret = lock_protocol::NOLOCK;
+        ret = lock_protocol::NOLOCK;
         printf("ERROR: No such lock (lock_id:%016llx) exists in the serve!\n", lid);
         return ret;
     }
     
-    lock* lt = index->second;
+    auto lt = index->second;
     if(lt->l_status == lock::LOCKED){
         lt->l_status = lock::FREE;
         pthread_cond_signal(&lt->_wc);
@@ -85,7 +80,33 @@ lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
         printf("WARNING: RE-releasing problem for the lock (lock_id: %016llx)!\n", lid);
     }
     pthread_mutex_unlock(&_ol);
+
+    return ret;
+}
+
+lock_protocol::status
+lock_server::remove(int clt, lock_protocol::lockid_t lid, int &r)
+{
+    pthread_mutex_lock(&_ol);
+    auto index = l_t.find(lid);
     lock_protocol::status ret = lock_protocol::OK;
 
+    if(index == l_t.end()){
+        r = nacquire;
+        pthread_mutex_unlock(&_ol);
+        ret = lock_protocol::NOLOCK;
+        printf("ERROR: No such lock (lock_id:%llx) exists in the server\n", lid);
+        return ret;
+    }
+
+    auto lt = index->second;
+    while(lt->l_status == lock::LOCKED){
+        printf("I'm waiting for the lock %llx in remove\n", lid);
+        pthread_cond_wait(&lt->_wc, &_ol);
+    }
+
+    l_t.erase(index);
+    pthread_mutex_unlock(&_ol);
+    printf("REMOVE DONE: successfully removing the lock (lock_id: %016llx)!\n", lid);
     return ret;
 }

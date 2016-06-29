@@ -1,7 +1,5 @@
 // yfs client.  implements FS operations using extent and lock server
 #include "yfs_client.h"
-#include "extent_client.h"
-#include "lock_client.h"
 #include <sstream>
 #include <iostream>
 #include <stdio.h>
@@ -12,10 +10,16 @@
 #include <ctime>
 
 
-yfs_client::yfs_client(std::string extent_dst, std::string lock_dst):rd_gen(std::time(0))
+yfs_client::yfs_client(std::string extent_dst, std::string lock_dst):rd_gen(getpid())
 {
   ec = new extent_client(extent_dst);
+  lc = new lock_client(lock_dst);
+}
 
+yfs_client::~yfs_client()
+{
+    delete ec;
+    delete lc;
 }
 
 yfs_client::inum yfs_client::n2i(std::string n)
@@ -51,13 +55,15 @@ int yfs_client::getfile(inum inum, fileinfo &fin)
   
   // You modify this function for Lab3
   // - hold and release the file lock
+  
+  RemoteScopedLock _l(lc, inum);
   printf("get file attr %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {
     r = IOERR;
     return r;
   }
-
+  
   fin.atime = a.atime;
   fin.mtime = a.mtime;
   fin.ctime = a.ctime;
@@ -71,6 +77,7 @@ int yfs_client::setfile(inum inum, struct stat *attr)
 {
     int r = OK;
 
+    RemoteScopedLock _l(lc, inum);
     printf("set file attr %016llx\n", inum);
 
     std::string content;
@@ -97,8 +104,8 @@ int yfs_client::setfile(inum inum, struct stat *attr)
     ret = ec->put(inum, content);
     if(ret != extent_protocol::OK){
         r = IOERR;
-        return r;
     }
+    
     printf("setfile %016llx -> sz %ld\n", inum, attr->st_size);
     return r;
 }
@@ -109,6 +116,9 @@ int yfs_client::getdir(inum inum, dirinfo &din)
   
   // You modify this function for Lab3
   // - hold and release the directory lock
+  
+  RemoteScopedLock _l(lc, inum);
+
   printf("getdir %016llx\n", inum);
   extent_protocol::attr a;
   if (ec->getattr(inum, a) != extent_protocol::OK) {
@@ -124,7 +134,7 @@ int yfs_client::getdir(inum inum, dirinfo &din)
 
 int yfs_client::readfile(inum inum, std::size_t off, std::size_t size, std::string &buf){
     int r = OK;
-
+    
     printf("Read file with id: %016llx\n", inum);
     if(!isfile(inum)){
         r = NOENT;
@@ -156,13 +166,15 @@ int yfs_client::readfile(inum inum, std::size_t off, std::size_t size, std::stri
 
 int yfs_client::writefile(inum inum, std::size_t off, std::size_t size, const char *buf){
     int r = OK;
-
+    
     printf("Write file with id:%016llx!\n", inum);
     if(!isfile(inum)){
         r = NOENT;
         printf("Error: Such inum:%016llx is unvalid for file!\n", inum);
         return r;
     }
+    
+    RemoteScopedLock _l(lc, inum);
 
     std::string content;
     extent_protocol::status ret = ec->get(inum, content);
@@ -217,6 +229,8 @@ int yfs_client::create(inum pid, std::string name, inum &eid, bool is_dir=false)
         return r;
     }
 
+    RemoteScopedLock pl(lc, pid);
+
     inum _id;
     extent_protocol::status ret = ec->lookup(pid, name, _id);
     if(ret == extent_protocol::OK){
@@ -230,7 +244,7 @@ int yfs_client::create(inum pid, std::string name, inum &eid, bool is_dir=false)
             r = IOERR;
             return r;
     }
-    
+
     inum new_inum;
     // pick a random number as new_inum for new extent
     for(int i = 0; i < 20; ++i){
@@ -244,6 +258,7 @@ int yfs_client::create(inum pid, std::string name, inum &eid, bool is_dir=false)
             continue;
         }
         else{
+            RemoteScopedLock el(lc, new_inum);
             ret = ec->create(pid, name, new_inum);
             if(ret == extent_protocol::OK){
                 r = OK;
@@ -285,7 +300,7 @@ int yfs_client::readdir(inum dir_id, std::map<std::string, inum> &ext_map)
 {
     int r = OK;
     printf("Reading dir info (dir id:%lld)!\n", dir_id);
-
+    
     extent_protocol::status ret = ec->readdir(dir_id, ext_map);
     if(ret == extent_protocol::NOENT){
         r = NOENT;
@@ -306,6 +321,8 @@ int yfs_client::unlink(inum pid, const char *name)
         return r;
     }
     
+    RemoteScopedLock pl(lc, pid);
+
     inum eid;
     extent_protocol::status ret;
     ret = ec->lookup(pid, name, eid);
@@ -314,11 +331,21 @@ int yfs_client::unlink(inum pid, const char *name)
         printf("No file named:%s exists under the dir:%lld\n", name, pid);
         return r;
     }
-
-    ret = ec->remove(eid);
-    if(ret == extent_protocol::NOENT){
+    
+    if(isdir(eid)){
         r = NOENT;
+        printf("ERROR! Content with name:%s is directory! Not a file!\n", name);
+        return r;
+    } 
+    
+    {
+        RemoteScopedLock el(lc, eid);
+        ret = ec->remove(eid);
+        if(ret == extent_protocol::NOENT){
+            r = NOENT;
+        }
     }
-
+    // remove the lock of content with eid
+    lc->remove(eid);
     return r;
 }

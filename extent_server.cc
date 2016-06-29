@@ -36,7 +36,7 @@ int extent_server::put(extent_protocol::extentid_t id, std::string buf, int &)
     
     auto file_it = ext_it->second;
     file_it->buf = buf;
-    file_it->attr.ctime = file_it->attr.mtime = std::time(nullptr);
+    file_it->attr.mtime = std::time(nullptr);
     file_it->attr.size = file_it->buf.size();
 
     printf("  Succeed put operation on %lld\n",id);

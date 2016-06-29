@@ -470,8 +470,7 @@ fuseserver_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
   
   if(ret == yfs_client::OK) fuse_reply_err(req, 0);
   else if(ret == yfs_client::NOENT) fuse_reply_err(req, ENOENT);
-
-  fuse_reply_err(req, ENOSYS);
+  else fuse_reply_err(req, ENOSYS);
 }
 
 void
