@@ -51,3 +51,11 @@ lock_client::release(lock_protocol::lockid_t lid)
     return ret;
 }
 
+lock_protocol::status
+lock_client::remove(lock_protocol::lockid_t lid)
+{
+    int r;
+    lock_protocol::status ret = cl->call(lock_protocol::remove, cl->id(), lid, r);
+    VERIFY(ret == lock_protocol::OK);
+    return ret;
+}

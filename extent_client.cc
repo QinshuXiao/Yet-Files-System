@@ -54,4 +54,27 @@ extent_client::remove(extent_protocol::extentid_t eid)
   return ret;
 }
 
+extent_protocol::status
+extent_client::create(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t eid)
+{
+    extent_protocol::status ret = extent_protocol::OK;
+    int r;
+    ret = cl->call(extent_protocol::create, parent_eid, name, eid, r);
+    return ret;
+}
 
+extent_protocol::status
+extent_client::lookup(extent_protocol::extentid_t parent_eid, std::string name, extent_protocol::extentid_t &eid)
+{
+    extent_protocol::status ret = extent_protocol::OK;
+    ret = cl->call(extent_protocol::lookup, parent_eid, name, eid);
+    return ret;
+}
+
+extent_protocol::status
+extent_client::readdir(extent_protocol::extentid_t eid, std::map<std::string, extent_protocol::extentid_t> &ext_map)
+{
+    extent_protocol::status ret = extent_protocol::OK;
+    ret = cl->call(extent_protocol::readdir, eid, ext_map);
+    return ret;
+}
