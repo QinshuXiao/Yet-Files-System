@@ -17,7 +17,7 @@
 #define MAX_PDU (10<<20) //maximum PDF is 10M
 
 
-connection::connection(chanmgr *m1, int f1, int l1) 
+connection::connection(chanmgr *m1, int f1, int l1)
 : mgr_(m1), fd_(f1), dead_(false),waiters_(0), refno_(1),lossy_(l1)
 {
 
@@ -30,8 +30,8 @@ connection::connection(chanmgr *m1, int f1, int l1)
 	VERIFY(pthread_mutex_init(&ref_m_,0)==0);
 	VERIFY(pthread_cond_init(&send_wait_,0)==0);
 	VERIFY(pthread_cond_init(&send_complete_,0)==0);
- 
-        VERIFY(gettimeofday(&create_time_, NULL) == 0); 
+
+        VERIFY(gettimeofday(&create_time_, NULL) == 0);
 
 	PollMgr::Instance()->add_callback(fd_, CB_RDONLY, this);
 }
@@ -75,7 +75,7 @@ connection::closeconn()
 			return;
 		}
 	}
-	//after block_remove_fd, select will never wait on fd_ 
+	//after block_remove_fd, select will never wait on fd_
 	//and no callbacks will be active
 	PollMgr::Instance()->block_remove_fd(fd_);
 }
@@ -185,7 +185,7 @@ connection::write_cb(int s)
 		if (wpdu_.solong < wpdu_.sz) {
 			return;
 		}
-	} 
+	}
 	pthread_cond_signal(&send_complete_);
 }
 
@@ -268,7 +268,7 @@ connection::readpdu()
 
 		if (sz > MAX_PDU) {
 			char *tmpb = (char *)&sz1;
-			jsl_log(JSL_DBG_2, "connection::readpdu read pdu TOO BIG %d network order=%x %x %x %x %x\n", sz, 
+			jsl_log(JSL_DBG_2, "connection::readpdu read pdu TOO BIG %d network order=%x %x %x %x %x\n", sz,
 					sz1, tmpb[0],tmpb[1],tmpb[2],tmpb[3]);
 			return false;
 		}
@@ -295,7 +295,7 @@ connection::readpdu()
 	return true;
 }
 
-tcpsconn::tcpsconn(chanmgr *m1, int port, int lossytest) 
+tcpsconn::tcpsconn(chanmgr *m1, int port, int lossytest)
 : mgr_(m1), lossy_(lossytest)
 {
 
@@ -326,7 +326,11 @@ tcpsconn::tcpsconn(chanmgr *m1, int port, int lossytest)
 		VERIFY(0);
 	}
 
-	jsl_log(JSL_DBG_2, "tcpsconn::tcpsconn listen on %d %d\n", port, 
+    socklen_t addrlen = sizeof(sin);
+    VERIFY(getsockname(tcp_, (sockaddr *)&sin, &addrlen) == 0);
+    port_ = ntohs(sin.sin_port);
+
+	jsl_log(JSL_DBG_2, "tcpsconn::tcpsconn listen on %d %d\n", port_,
 		sin.sin_port);
 
 	if (pipe(pipe_) < 0) {
@@ -338,7 +342,7 @@ tcpsconn::tcpsconn(chanmgr *m1, int port, int lossytest)
 	flags |= O_NONBLOCK;
 	fcntl(pipe_[0], F_SETFL, flags);
 
-	VERIFY((th_ = method_thread(this, false, &tcpsconn::accept_conn)) != 0); 
+	VERIFY((th_ = method_thread(this, false, &tcpsconn::accept_conn)) != 0);
 }
 
 tcpsconn::~tcpsconn()
@@ -351,7 +355,7 @@ tcpsconn::~tcpsconn()
 	for (i = conns_.begin(); i != conns_.end(); i++) {
 		i->second->closeconn();
 		i->second->decref();
-	}	
+	}
 }
 
 void
@@ -359,13 +363,13 @@ tcpsconn::process_accept()
 {
 	sockaddr_in sin;
 	socklen_t slen = sizeof(sin);
-	int s1 = accept(tcp_, (sockaddr *)&sin, &slen); 
+	int s1 = accept(tcp_, (sockaddr *)&sin, &slen);
 	if (s1 < 0) {
 		perror("tcpsconn::accept_conn error");
 		pthread_exit(NULL);
 	}
 
-	jsl_log(JSL_DBG_2, "accept_loop got connection fd=%d %s:%d\n", 
+	jsl_log(JSL_DBG_2, "accept_loop got connection fd=%d %s:%d\n",
 			s1, inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
 	connection *ch = new connection(mgr_, s1, lossy_);
 
@@ -394,7 +398,7 @@ tcpsconn::accept_conn()
 	fd_set rfds;
 	int max_fd = pipe_[0] > tcp_ ? pipe_[0] : tcp_;
 
-	while (1) { 
+	while (1) {
 		FD_ZERO(&rfds);
 		FD_SET(pipe_[0], &rfds);
 		FD_SET(tcp_, &rfds);
@@ -431,7 +435,7 @@ connect_to_dst(const sockaddr_in &dst, chanmgr *mgr, int lossy)
 	int yes = 1;
 	setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
 	if(connect(s, (sockaddr*)&dst, sizeof(dst)) < 0) {
-		jsl_log(JSL_DBG_1, "rpcc::connect_to_dst failed to %s:%d\n", 
+		jsl_log(JSL_DBG_1, "rpcc::connect_to_dst failed to %s:%d\n",
 				inet_ntoa(dst.sin_addr), (int)ntohs(dst.sin_port));
 		close(s);
 		return NULL;

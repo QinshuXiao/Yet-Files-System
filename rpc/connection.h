@@ -43,7 +43,7 @@ class connection : public aio_callback {
 		void incref();
 		void decref();
 		int ref();
-                
+
                 int compare(connection *another);
 	private:
 
@@ -56,7 +56,7 @@ class connection : public aio_callback {
 
 		charbuf wpdu_;
 		charbuf rpdu_;
-                
+
                 struct timeval create_time_;
 
 		int waiters_;
@@ -73,10 +73,10 @@ class tcpsconn {
 	public:
 		tcpsconn(chanmgr *m1, int port, int lossytest=0);
 		~tcpsconn();
-
+        inlone int port() { return port_; }
 		void accept_conn();
 	private:
-
+        int port_;
 		pthread_mutex_t m_;
 		pthread_t th_;
 		int pipe_[2];
